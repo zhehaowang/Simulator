@@ -1,8 +1,0 @@
-{"sensor_id":"222_f1_HA_s2","sensor_type":"temperature","value":73,"timestamp":"16:44:04"}{"sensor_id":"222_f1_HA_A12_s1","sensor_type":"temperature","value":73,"timestamp":"16:44:05"}{"sensor_id":"222_f1_HA_A13_s3","sensor_type":"temperature","value":76,"timestamp":"16:44:06"}{"sensor_id":"222_st1_s4","sensor_type":"temperature","value":78,"timestamp":"16:44:07"}{"sensor_id":"222_f1_HA_s2","sensor_type":"temperature","value":74,"timestamp":"16:44:08"}{"sensor_id":"222_f1_HA_s2","sensor_type":"temperature","value":79,"timestamp":"16:52:30"}
-{"sensor_id":"222_f1_HA_A12_s1","sensor_type":"temperature","value":74,"timestamp":"16:52:32"}
-{"sensor_id":"222_f1_HA_A13_s3","sensor_type":"temperature","value":74,"timestamp":"16:52:33"}
-{"sensor_id":"222_st1_s4","sensor_type":"temperature","value":79,"timestamp":"16:52:34"}
-{"sensor_id":"222_f1_HA_s2","sensor_type":"temperature","value":77,"timestamp":"16:52:35"}
-{"sensor_id":"222_f1_HA_A12_s1","sensor_type":"temperature","value":73,"timestamp":"16:52:36"}
-{"sensor_id":"222_f1_HA_A13_s3","sensor_type":"temperature","value":76,"timestamp":"16:52:37"}
-{"sensor_id":"222_st1_s4","sensor_type":"temperature","value":78,"timestamp":"16:52:38"}

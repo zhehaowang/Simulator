@@ -9,3 +9,5 @@ If no db entry before:
 mysql -u[] -p[] < smart-building.sql
 
 Change in source the dbConnection (usr pwd, etc)
+
+Change file path to being suitable for a UNIX FS
