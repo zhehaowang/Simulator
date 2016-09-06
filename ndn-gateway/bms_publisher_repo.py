@@ -59,10 +59,26 @@ class DataPublisher(object):
         self._loop = loop
         self._cache = cache
         self._namespace = namespace
+        self._sensorList = []
+
+    def publishMetadata(self):
+        # For now, hardcoded sensor list on gateway's end
+        data = Data(Name(self._namespace).append("_meta").append(str(int(time.time() * 1000.0))))
+        data.setContent(json.dumps({"list" : self._sensorList}))
+        data.getMetaInfo().setFreshnessPeriod(self._defaultFreshnessPeriod)
+        self._keyChain.sign(data)
+        self._cache.add(data)
+        print("Metadata " + data.getName().toUri() + " added for sensor list: " + str(self._sensorList))
+
+        self.startRepoInsertion(data)
 
     def publish(self, line):
         dataObject = json.loads(line)
-        dataName = Name(self._namespace).append(Name(self.msgLocationToHierarchicalName(dataObject["sensor_id"]))).append(self.msgTimestampToNameComponent(dataObject["timestamp"]))
+        locationName = Name(self.msgLocationToHierarchicalName(dataObject["sensor_id"]))
+        if not (locationName.toUri() in self._sensorList):
+            self._sensorList.append(locationName.toUri())
+            self.publishMetadata()
+        dataName = Name(self._namespace).append(locationName).append(self.msgTimestampToNameComponent(dataObject["timestamp"]))
         data = Data(dataName)
         data.setContent(line)
         data.getMetaInfo().setFreshnessPeriod(self._defaultFreshnessPeriod)
@@ -128,6 +144,7 @@ class DataPublisher(object):
         f = subprocess.Popen(['tail','-F', filename],\
               stdout = subprocess.PIPE,stderr = subprocess.PIPE)
         
+        # Using kqueue instead of select.poll for OSX
         kq = select.kqueue()
         kevent = select.kevent(f.stdout,
                        filter=select.KQ_FILTER_READ, # we are interested in reads

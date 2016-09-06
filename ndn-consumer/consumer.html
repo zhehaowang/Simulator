@@ -1,0 +1,146 @@
+<?xml version = "1.0" encoding="utf-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"DTD/xhtml1-strict.dtd">
+<!--
+ * Copyright (C) 2014-2016 Regents of the University of California.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * A copy of the GNU Lesser General Public License is in the file COPYING.
+-->
+<html xmlns = "http://www.w3.org/1999/xhtml">
+<meta charset="UTF-8">
+
+<head>
+  <title>NDN Get via WebSocket</title>
+
+  <script type="text/javascript" src="js/ndn-min.js"></script>
+
+  <script type="text/javascript">
+    var face = new Face({host: "localhost", port: 9696});
+    var sensorsList = [];
+    var running = true;
+    
+    function onMetaData(interest, data)
+    {
+      var nameStr = escape(data.getName().toUri());
+  
+      //document.getElementById('content').innerHTML += "<p>Name string: " + nameStr + "</p>";
+      //document.getElementById('content').innerHTML += "<p>Data content: " + JSON.parse(data.getContent().buf()) + "</p>";
+
+      var sensors = JSON.parse(data.getContent().buf())["list"];
+      for (var i = 0; i < sensors.length; i++) {
+        if (!(sensors[i] in sensorsList)) {
+          fetchSensorData(sensors[i]);
+        }
+      }
+
+      var newInterest = new Interest(interest.getName());
+      var exclude = new Exclude();
+  
+      exclude.appendAny();
+      exclude.appendComponent(data.getName().get(-1));
+      newInterest.setExclude(exclude);
+      
+      newInterest.setMustBeFresh(true);
+      newInterest.setInterestLifetimeMilliseconds(4000);
+      // for hint interest, the rightMostChild is preferred.
+      newInterest.setChildSelector(1);
+      if (running) {
+        face.expressInterest(newInterest, onMetaData, onMetaTimeout);
+      }
+    }
+
+    function onSensorData(interest, data)
+    {
+      var dataObject = JSON.parse(data.getContent().buf());
+
+      document.getElementById('content').innerHTML += "Got sensor data: " + data.getName().toUri() + " - " + dataObject["sensor_type"] + " : " + dataObject["value"].toString() + "<br>";
+      
+      var newInterest = new Interest(interest.getName());
+      var exclude = new Exclude();
+  
+      exclude.appendAny();
+      exclude.appendComponent(data.getName().get(-1));
+      newInterest.setExclude(exclude);
+      
+      newInterest.setMustBeFresh(true);
+      newInterest.setInterestLifetimeMilliseconds(4000);
+      // for hint interest, the rightMostChild is preferred.
+      newInterest.setChildSelector(1);
+      if (running) {
+        face.expressInterest(newInterest, onSensorData, onSensorTimeout);
+      }
+    }
+
+    function onMetaTimeout(interest)
+    {
+      if (running) {
+        var newInterest = new Interest(interest);
+        interest.refreshNonce();
+        face.expressInterest(interest, onMetaData, onMetaTimeout);
+      }
+      console.log("onTimeout called: " + interest.getName().toUri());
+    }
+
+    function onSensorTimeout(interest)
+    {
+      if (running) {
+        var newInterest = new Interest(interest);
+        interest.refreshNonce();
+        face.expressInterest(interest, onSensorData, onSensorTimeout);  
+      }
+      console.log("onTimeout called: " + interest.getName().toUri());
+    }
+
+    function run() {
+      var name = new Name(document.getElementById('interest').value).append("_meta");
+      var interest = new Interest(name);
+      interest.setInterestLifetimeMilliseconds(4000);
+      interest.setChildSelector(1);
+      interest.setMustBeFresh(true);
+      running = true;
+      face.expressInterest(interest, onMetaData, onMetaTimeout);
+    }
+
+    function stop() {
+      running = false;
+    }
+
+    function fetchSensorData(sensorNameString) {
+      console.log(sensorNameString);
+
+      document.getElementById('content').innerHTML += "Fetching from new sensor: " + sensorNameString + "<br>";
+      
+      var namespace = new Name(document.getElementById('interest').value);
+      var interest = new Interest(new Name(namespace).append(new Name(sensorNameString)));
+      interest.setInterestLifetimeMilliseconds(4000);
+      interest.setChildSelector(1);
+      interest.setMustBeFresh(true);
+      face.expressInterest(interest, onSensorData, onSensorTimeout);
+    }
+  </script>
+
+</head>
+<body >
+
+  Namespace:<br />
+  <input id="interest" type="text" name="INTEREST" size="50" value="/ndn/nist/bms" />
+
+  <button id="startBtn" onclick="run()">Fetch Content</button>
+  <button id="stopBtn" onclick="stop()">Stop fetching content</button>
+
+  <div id="content">Content: <br/></div>
+
+</body>
+</html>
