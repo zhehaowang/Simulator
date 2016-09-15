@@ -28,7 +28,8 @@
 
   <script type="text/javascript">
     var face = new Face({host: "localhost", port: 9696});
-    var sensorsList = [];
+    var sensorsList = {};
+    var imageHexString = "";
     var running = true;
     
     function onMetaData(interest, data)
@@ -40,8 +41,9 @@
 
       var sensors = JSON.parse(data.getContent().buf())["list"];
       for (var i = 0; i < sensors.length; i++) {
-        if (!(sensors[i] in sensorsList)) {
-          fetchSensorData(sensors[i]);
+        if (!(sensors[i]["id"] in sensorsList)) {
+          fetchSensorData(sensors[i]["id"]);
+          sensorsList[sensors[i]["id"]] = sensors[i];
         }
       }
 
@@ -83,6 +85,17 @@
       }
     }
 
+    function onImgData(interest, data)
+    {
+      var segmentNo = interest.get(-1).toEscapedString();
+      var newInterest = new Interest(interest.getName().getPrefix(-1).appendSegment(parseInt(segmentNo) + 1));
+      newInterest.setMustBeFresh(true);
+      newInterest.setInterestLifetimeMilliseconds(4000);
+      if (running) {
+        face.expressInterest(newInterest, onImgData, onImgTimeout);
+      }
+    }
+
     function onMetaTimeout(interest)
     {
       if (running) {
@@ -103,14 +116,33 @@
       console.log("onTimeout called: " + interest.getName().toUri());
     }
 
+    function onImgTimeout(interest)
+    {
+      if (running) {
+        console.log("Image timeout called: " + interest.getName().toUri());
+        console.log("Assuming image ready to assemble");
+
+        document.getElementById("image").src = imageHexString;
+      }
+    }
+
     function run() {
+      // fetch sensor list from _meta branch
       var name = new Name(document.getElementById('interest').value).append("_meta");
       var interest = new Interest(name);
       interest.setInterestLifetimeMilliseconds(4000);
       interest.setChildSelector(1);
       interest.setMustBeFresh(true);
-      running = true;
       face.expressInterest(interest, onMetaData, onMetaTimeout);
+
+      // fetch the image from _img branch
+      var name = new Name(document.getElementById('interest').value).append("_img").append("0");
+      var interest = new Interest(name);
+      interest.setInterestLifetimeMilliseconds(4000);
+      interest.setMustBeFresh(true);
+      face.expressInterest(interest, onImgData, onImgTimeout);
+
+      running = true;
     }
 
     function stop() {
@@ -139,6 +171,10 @@
 
   <button id="startBtn" onclick="run()">Fetch Content</button>
   <button id="stopBtn" onclick="stop()">Stop fetching content</button>
+
+  <br>
+  <img id="image"></img>
+  <br>
 
   <div id="content">Content: <br/></div>
 

@@ -1,1 +1,4 @@
-{"Image_file_path":"C:\/Users\/snk14\/Desktop\/floor2.jpg"}{"Sendor_ID":"S1","X":72.0,"Y":108.0}{"Sendor_ID":"S1","X":110.0,"Y":330.0}{"Sendor_ID":"S1","X":160.0,"Y":108.0}{"Sendor_ID":"S1","X":180.0,"Y":34.0}
+{"Sensor_ID":"222_f1_HA_A12_S1","X":72.0,"Y":108.0}
+{"Sensor_ID":"222_f1_HA_S2","X":110.0,"Y":330.0}
+{"Sensor_ID":"222_f1_HA_A13_S3","X":160.0,"Y":108.0}
+{"Sensor_ID":"222_st1_S4","X":180.0,"Y":34.0}

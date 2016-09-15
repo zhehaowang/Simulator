@@ -42,8 +42,10 @@ import subprocess
 repoCommandPrefix = Name("/repo/command")
 epoch = datetime.utcfromtimestamp(0)
 
+defaultBlockSize = 4096
+
 class DataPublisher(object):
-    def __init__(self, face, keyChain, loop, cache, namespace):
+    def __init__(self, face, keyChain, loop, cache, namespace, imgFilePath, locationFilePath):
         # Start time of this instance
         self._startTime = 0
 
@@ -61,6 +63,30 @@ class DataPublisher(object):
         self._namespace = namespace
         self._sensorList = []
 
+        self._imageFilePath = imgFilePath
+        self._sensorLocations = dict()
+        with open(locationFilePath, 'r') as locationFile:
+            lines = locationFile.readlines()
+            for line in lines:
+                location = json.loads(line)
+                self._sensorLocations[location["Sensor_ID"]] = {"X": location['X'], "Y": location['Y']}
+
+    def publishFloorImage(self):
+        with open(self._imageFilePath, 'rb') as imageFile:
+            segment = 0
+            bytes = imageFile.read(defaultBlockSize)
+            while bytes != "":
+                data = Data(Name(self._namespace).append("_img").append(str(segment)))
+                segment += 1
+                #data.getMetaInfo().setFinalBlockId()
+                data.getMetaInfo().setFreshnessPeriod(self._defaultFreshnessPeriod)
+                self._keyChain.sign(data)
+                self._cache.add(data)
+                self.startRepoInsertion(data)
+
+                bytes = imageFile.read(defaultBlockSize)
+        return
+
     def publishMetadata(self):
         # For now, hardcoded sensor list on gateway's end
         data = Data(Name(self._namespace).append("_meta").append(str(int(time.time() * 1000.0))))
@@ -71,12 +97,18 @@ class DataPublisher(object):
         print("Metadata " + data.getName().toUri() + " added for sensor list: " + str(self._sensorList))
 
         self.startRepoInsertion(data)
+        return
 
     def publish(self, line):
         dataObject = json.loads(line)
         locationName = Name(self.msgLocationToHierarchicalName(dataObject["sensor_id"]))
         if not (locationName.toUri() in self._sensorList):
-            self._sensorList.append(locationName.toUri())
+            if locationName.toUri() in self._sensorLocations:
+                x = self._sensorLocations[locationName.toUri()]['X']
+                y = self._sensorLocations[locationName.toUri()]['Y']
+                self._sensorList.append({"id": locationName.toUri(), "x": x, "y": y})
+            else:
+                self._sensorList.append({"id": locationName.toUri()})
             self.publishMetadata()
         dataName = Name(self._namespace).append(locationName).append(self.msgTimestampToNameComponent(dataObject["timestamp"]))
         data = Data(dataName)
@@ -201,6 +233,10 @@ def main():
     parser.add_argument('filename', help='datahub log file')
     parser.add_argument('-f', dest='follow', action='store_true', help='follow (tail -f) the log file')  
     parser.add_argument('--namespace', default='/ndn/nist/bms', help='root of ndn name, no trailing slash')
+
+    parser.add_argument('--image', dest='image', default='../simulator/res/floor2.jpg', help='the floor plan to publish')
+    parser.add_argument('--location', dest='location', default='../simulator/res/locations.txt', help='the floor plan to publish')
+
     args = parser.parse_args()
     
     # Setup logging
@@ -217,9 +253,10 @@ def main():
     face.setCommandSigningInfo(keyChain, certificateName)
     cache = MemoryContentCache(face)
 
-    dataPublisher = DataPublisher(face, keyChain, loop, cache, args.namespace)
+    dataPublisher = DataPublisher(face, keyChain, loop, cache, args.namespace, args.image, args.location)
     cache.registerPrefix(Name(args.namespace), dataPublisher.onRegisterFailed, dataPublisher.onDataNotFound)
-    
+    dataPublisher.publishFloorImage()
+
     if args.follow:
         #asyncio.async(loop.run_in_executor(executor, followfile, args.filename, args.namespace, cache))
         loop.run_until_complete(dataPublisher.followfile(args.filename))
