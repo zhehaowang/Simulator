@@ -1,0 +1,1 @@
+{"Image_file_path":"C:\/Users\/snk14\/Desktop\/floor2.jpg"}{"Sendor_ID":"S1","X":72.0,"Y":108.0}{"Sendor_ID":"S1","X":110.0,"Y":330.0}{"Sendor_ID":"S1","X":160.0,"Y":108.0}{"Sendor_ID":"S1","X":180.0,"Y":34.0}
