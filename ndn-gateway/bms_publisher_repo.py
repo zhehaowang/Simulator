@@ -42,14 +42,14 @@ import subprocess
 repoCommandPrefix = Name("/repo/command")
 epoch = datetime.utcfromtimestamp(0)
 
-defaultBlockSize = 4096
+defaultBlockSize = 3072
 
 class DataPublisher(object):
     def __init__(self, face, keyChain, loop, cache, namespace, imgFilePath, locationFilePath):
         # Start time of this instance
         self._startTime = 0
 
-        self._defaultFreshnessPeriod = 10000
+        self._defaultFreshnessPeriod = 1000000
         # Dictionary that holds the temporary data to calculate aggregation with
         # Key   - sensor name
         # Value - data list: [], list of sensor data
@@ -61,7 +61,7 @@ class DataPublisher(object):
         self._loop = loop
         self._cache = cache
         self._namespace = namespace
-        self._sensorList = []
+        self._sensorList = dict()
 
         self._imageFilePath = imgFilePath
         self._sensorLocations = dict()
@@ -69,8 +69,9 @@ class DataPublisher(object):
             lines = locationFile.readlines()
             for line in lines:
                 location = json.loads(line)
-                self._sensorLocations[location["Sensor_ID"]] = {"X": location['X'], "Y": location['Y']}
+                self._sensorLocations[Name(self.msgLocationToHierarchicalName(location["Sensor_ID"])).toUri()] = {"X": location['X'], "Y": location['Y']}
 
+    @asyncio.coroutine
     def publishFloorImage(self):
         with open(self._imageFilePath, 'rb') as imageFile:
             segment = 0
@@ -79,18 +80,23 @@ class DataPublisher(object):
                 data = Data(Name(self._namespace).append("_img").append(str(segment)))
                 segment += 1
                 #data.getMetaInfo().setFinalBlockId()
+                data.setContent(b64encode(bytes))
                 data.getMetaInfo().setFreshnessPeriod(self._defaultFreshnessPeriod)
                 self._keyChain.sign(data)
                 self._cache.add(data)
-                self.startRepoInsertion(data)
 
+                print(data.getName().toUri())
+                yield None
+
+                self.startRepoInsertion(data)
                 bytes = imageFile.read(defaultBlockSize)
+                time.sleep(0.1)
         return
 
     def publishMetadata(self):
         # For now, hardcoded sensor list on gateway's end
         data = Data(Name(self._namespace).append("_meta").append(str(int(time.time() * 1000.0))))
-        data.setContent(json.dumps({"list" : self._sensorList}))
+        data.setContent(json.dumps(self._sensorList))
         data.getMetaInfo().setFreshnessPeriod(self._defaultFreshnessPeriod)
         self._keyChain.sign(data)
         self._cache.add(data)
@@ -103,12 +109,14 @@ class DataPublisher(object):
         dataObject = json.loads(line)
         locationName = Name(self.msgLocationToHierarchicalName(dataObject["sensor_id"]))
         if not (locationName.toUri() in self._sensorList):
+            print self._sensorLocations
+            print locationName.toUri()
             if locationName.toUri() in self._sensorLocations:
                 x = self._sensorLocations[locationName.toUri()]['X']
                 y = self._sensorLocations[locationName.toUri()]['Y']
-                self._sensorList.append({"id": locationName.toUri(), "x": x, "y": y})
+                self._sensorList[locationName.toUri()] = {"id": locationName.toUri(), "x": x, "y": y}
             else:
-                self._sensorList.append({"id": locationName.toUri()})
+                self._sensorList[locationName.toUri()] = {"id": locationName.toUri()}
             self.publishMetadata()
         dataName = Name(self._namespace).append(locationName).append(self.msgTimestampToNameComponent(dataObject["timestamp"]))
         data = Data(dataName)
@@ -255,7 +263,7 @@ def main():
 
     dataPublisher = DataPublisher(face, keyChain, loop, cache, args.namespace, args.image, args.location)
     cache.registerPrefix(Name(args.namespace), dataPublisher.onRegisterFailed, dataPublisher.onDataNotFound)
-    dataPublisher.publishFloorImage()
+    loop.run_until_complete(dataPublisher.publishFloorImage())
 
     if args.follow:
         #asyncio.async(loop.run_in_executor(executor, followfile, args.filename, args.namespace, cache))

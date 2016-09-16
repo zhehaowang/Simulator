@@ -29,7 +29,7 @@
   <script type="text/javascript">
     var face = new Face({host: "localhost", port: 9696});
     var sensorsList = {};
-    var imageHexString = "";
+    var imageHexString = "data:image/jpeg;base64,";
     var running = true;
     
     function onMetaData(interest, data)
@@ -39,11 +39,12 @@
       //document.getElementById('content').innerHTML += "<p>Name string: " + nameStr + "</p>";
       //document.getElementById('content').innerHTML += "<p>Data content: " + JSON.parse(data.getContent().buf()) + "</p>";
 
-      var sensors = JSON.parse(data.getContent().buf())["list"];
-      for (var i = 0; i < sensors.length; i++) {
-        if (!(sensors[i]["id"] in sensorsList)) {
-          fetchSensorData(sensors[i]["id"]);
-          sensorsList[sensors[i]["id"]] = sensors[i];
+      var sensors = JSON.parse(data.getContent().buf());
+      for (var key in sensors) {
+        if (!(key in sensorsList)) {
+          fetchSensorData(key);
+          sensorsList[key] = sensors[key];
+          console.log(sensors[key]);
         }
       }
 
@@ -87,10 +88,11 @@
 
     function onImgData(interest, data)
     {
-      var segmentNo = interest.get(-1).toEscapedString();
-      var newInterest = new Interest(interest.getName().getPrefix(-1).appendSegment(parseInt(segmentNo) + 1));
+      var segmentNo = interest.getName().get(-1).toEscapedString();
+      var newInterest = new Interest(interest.getName().getPrefix(-1).append((parseInt(segmentNo) + 1).toString()));
       newInterest.setMustBeFresh(true);
       newInterest.setInterestLifetimeMilliseconds(4000);
+      imageHexString += data.getContent().buf();
       if (running) {
         face.expressInterest(newInterest, onImgData, onImgTimeout);
       }
@@ -122,7 +124,24 @@
         console.log("Image timeout called: " + interest.getName().toUri());
         console.log("Assuming image ready to assemble");
 
-        document.getElementById("image").src = imageHexString;
+        //document.getElementById("image").setAttribute('src', imageHexString);
+        
+        setTimeout(function() {
+          var canvas = document.getElementById("my-canvas");
+          var ctx = canvas.getContext("2d");
+
+          var img = new Image();
+          img.onload = function() {
+            ctx.drawImage(this, 0, 0, canvas.width, canvas.height);
+            for (var key in sensorsList) {  
+              ctx.fillRect(sensorsList[key]["x"], sensorsList[key]["y"], 20, 20);
+            }
+          }
+          img.src = imageHexString;
+          
+          
+        }, 2000);
+
       }
     }
 
@@ -172,9 +191,10 @@
   <button id="startBtn" onclick="run()">Fetch Content</button>
   <button id="stopBtn" onclick="stop()">Stop fetching content</button>
 
-  <br>
-  <img id="image"></img>
-  <br>
+  <p>
+    <canvas id="my-canvas" width="600" height="1600">
+    </canvas>
+  </p>
 
   <div id="content">Content: <br/></div>
 
